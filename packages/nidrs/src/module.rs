@@ -86,6 +86,7 @@ pub struct NidrsFactory<T: Module> {
     pub module: Option<T>,
     pub module_ctx: ModuleCtx,
     pub router: axum::Router<StateCtx>,
+    pub host: String,
     pub port: u32,
     pub rt: RwLock<Option<tokio::runtime::Runtime>>,
     pub inter_apply: Vec<Box<dyn FnOnce(axum::Router<StateCtx>) -> axum::Router<StateCtx> + 'static>>,
@@ -102,6 +103,7 @@ impl<T: Module> NidrsFactory<T> {
             router,
             module: Some(module),
             module_ctx,
+            host: String::from("127.0.0.1"),
             port: 3000,
             router_hook: Box::new(|r| r.router),
             inter_apply: vec![],
@@ -158,8 +160,9 @@ impl<T: Module> NidrsFactory<T> {
         self
     }
 
-    pub fn listen(mut self, port: u32) -> Self {
+    pub fn listen(mut self, port: u32, host: &str) -> Self {
         self.port = port;
+        self.host = String::from(host);
         let module = self.module.take().unwrap();
 
         self.module_ctx = module.init(self.module_ctx);
@@ -180,9 +183,9 @@ impl<T: Module> NidrsFactory<T> {
         {
             self.router = self.router.merge(nidrs_openapi::register(&self.module_ctx.routers));
 
-            nidrs_macro::log!("Swagger UI on {}", format!("http://127.0.0.1:{}/swagger-ui", self.port));
-            nidrs_macro::log!("Rapidoc UI on {}", format!("http://127.0.0.1:{}/rapidoc", self.port));
-            nidrs_macro::log!("Redoc UI on {}", format!("http://127.0.0.1:{}/redoc", self.port));
+            nidrs_macro::log!("Swagger UI on {}", format!("http://{}:{}/swagger-ui", self.host, self.port));
+            nidrs_macro::log!("Rapidoc UI on {}", format!("http://{}:{}/rapidoc", self.host, self.port));
+            nidrs_macro::log!("Redoc UI on {}", format!("http://{}:{}/redoc", self.host, self.port));
         }
 
         while let Some(apply) = self.inter_apply.pop() {
@@ -195,7 +198,7 @@ impl<T: Module> NidrsFactory<T> {
     pub fn block(mut self) {
         // listen...
         let server = || async {
-            let tcp = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", self.port)).await?;
+            let tcp = tokio::net::TcpListener::bind(format!("{}:{}", self.host, self.port)).await?;
             let addr = tcp.local_addr()?;
             nidrs_macro::log!("Listening on {}", addr);
 

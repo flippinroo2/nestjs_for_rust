@@ -1,4 +1,8 @@
-/target
+# Files
 .DS_Store
-rustc*
 .idea
+# Cargo.lock
+
+# Folders
+/target
+rustc*

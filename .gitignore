@@ -1,7 +1,7 @@
 # Files
 .DS_Store
 .idea
-# Cargo.lock
+Cargo.lock
 
 # Folders
 /target

@@ -160,9 +160,9 @@ impl<T: Module> NidrsFactory<T> {
         self
     }
 
-    pub fn listen(mut self, port: u32, host: &str) -> Self {
-        self.port = port;
+    pub fn listen(mut self, host: &str, port: u32) -> Self {
         self.host = String::from(host);
+        self.port = port;
         let module = self.module.take().unwrap();
 
         self.module_ctx = module.init(self.module_ctx);

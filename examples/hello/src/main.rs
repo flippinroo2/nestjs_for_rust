@@ -60,7 +60,7 @@ fn main() {
     //     }
     // });
 
-    let app = app.listen(3000, "127.0.0.1");
+    let app = app.listen("127.0.0.1", 3000);
 
     // app.router = app.router.route_layer(middleware::from_fn(auth));
     // app.router = app.router.layer(ServiceBuilder::new().layer(middleware::from_fn(auth)));

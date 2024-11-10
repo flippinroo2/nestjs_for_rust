@@ -166,11 +166,14 @@ impl<T: Module> NidrsFactory<T> {
         let module = self.module.take().unwrap();
 
         self.module_ctx = module.init(self.module_ctx);
-        // println!("ModuleCtx Imports: {:?}", &module_ctx.imports);
-        // println!("ModuleCtx Exports: {:?}", &module_ctx.exports);
-        // println!("ModuleCtx Deps: {:?}", &module_ctx.deps);
-        // println!("ModuleCtx Services: {:?}", &module_ctx.services.keys());
-        // println!("ModuleCtx Globals: {:?}", &module_ctx.globals);
+        let DEBUG = false;
+        if(DEBUG){
+          println!("ModuleCtx Imports: {:?}", self.module_ctx.imports);
+          println!("ModuleCtx Exports: {:?}", self.module_ctx.exports);
+          println!("ModuleCtx Deps: {:?}", self.module_ctx.deps);
+          println!("ModuleCtx Services: {:?}", self.module_ctx.services.keys());
+          println!("ModuleCtx Globals: {:?}", self.module_ctx.globals);
+        }
 
         let mut sub_router = axum::Router::new();
         for router in self.module_ctx.routers.iter() {

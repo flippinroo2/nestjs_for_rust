@@ -1,19 +1,49 @@
-[workspace]
-members = ["apps/*", "libs/*"]
-resolver = "2"
+# [workspace]
+# members = ["apps/*", "libs/*"]
+# resolver = "2"
 
-[workspace.package]
+# [workspace.package]
+# edition = "2021"
+# homepage = "https://github.com/nidrs/nidrs.git"
+# repository = "https://github.com/nidrs/nidrs.git"
+# license = "MIT"
+
+# [workspace.dependencies]
+# nidrs = { path = "../../packages/nidrs", features = ["tower", "serde", "openapi"]  }
+# nidrs-macro = { path = "../../packages/nidrs-macro" }
+# nidrs-extern = { path = "../../packages/nidrs-extern" }
+# nidrs-diesel = { path = "../../packages/nidrs-diesel", features = ["postgres"] }
+
+# shared = { path = "libs/shared" }
+# macros = { path = "libs/macros" }
+# datasets = { path = "libs/datasets" }
+
+[package]
+name = "scapp"
+resolver = "2"
 edition = "2021"
 homepage = "https://github.com/nidrs/nidrs.git"
 repository = "https://github.com/nidrs/nidrs.git"
 license = "MIT"
 
-[workspace.dependencies]
+[[bin]]
+name = "_scapp_binary"
+path = "apps/app/src/main.rs"
+
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+diesel = { version = "2.2.4", features = ["chrono", "postgres", "r2d2", "sqlite"] }
+dotenvy = "0.15"
+serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.115"
+utoipa = "4.2.3"
+
 nidrs = { path = "../../packages/nidrs", features = ["tower", "serde", "openapi"]  }
-nidrs-macro = { path = "../../packages/nidrs-macro" }
 nidrs-extern = { path = "../../packages/nidrs-extern" }
 nidrs-diesel = { path = "../../packages/nidrs-diesel", features = ["postgres"] }
+nidrs-macro = { path = "../../packages/nidrs-macro" }
 
-shared = { path = "libs/shared" }
-macros = { path = "libs/macros" }
 datasets = { path = "libs/datasets" }
+macros = { path = "libs/macros" }
+shared = { path = "libs/shared" }

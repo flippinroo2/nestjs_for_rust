@@ -18,9 +18,11 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
+use tower_http::cors::CorsLayer;
 
 use crate::{provider, shared::otr, template_format, AppResult, InnerMeta, Interceptor, Service};
 
+static DEBUG: bool = false;
 static GLOBALS_KEY: &str = "Defaults";
 
 pub trait Module {
@@ -96,7 +98,13 @@ pub struct NidrsFactory<T: Module> {
 
 impl<T: Module> NidrsFactory<T> {
     pub fn create(module: T) -> Self {
+        // TODO: Creating original axum::Router
         let router: axum::Router<StateCtx> = axum::Router::new();
+        let cross_origin_layer = CorsLayer::new()
+            .allow_origin(tower_http::cors::Any) // Allow requests from any origin
+            .allow_methods(tower_http::cors::Any) // Allow all HTTP methods (GET, POST, etc.)
+            .allow_headers(tower_http::cors::Any); // Allow all headers (e.g., Content-Type, Authorization)
+                                                   // router.layer(cross_origin_layer);
         let module_ctx = ModuleCtx::new(ModuleDefaults { default_version: "v1", default_prefix: "" });
         NidrsFactory {
             rt: RwLock::new(None),
@@ -126,6 +134,7 @@ impl<T: Module> NidrsFactory<T> {
         self.module_ctx.register_interceptor(GLOBALS_KEY, &service_name, Box::new(interceptor.clone()));
 
         self.inter_apply.push(Box::new(move |router| {
+            // TODO: layer()
             router.layer(axum::middleware::from_fn({
                 move |req: axum::extract::Request, next: axum::middleware::Next| {
                     let inter = std::sync::Arc::clone(&interceptor);
@@ -166,13 +175,12 @@ impl<T: Module> NidrsFactory<T> {
         let module = self.module.take().unwrap();
 
         self.module_ctx = module.init(self.module_ctx);
-        let DEBUG = false;
-        if(DEBUG){
-          println!("ModuleCtx Imports: {:?}", self.module_ctx.imports);
-          println!("ModuleCtx Exports: {:?}", self.module_ctx.exports);
-          println!("ModuleCtx Deps: {:?}", self.module_ctx.deps);
-          println!("ModuleCtx Services: {:?}", self.module_ctx.services.keys());
-          println!("ModuleCtx Globals: {:?}", self.module_ctx.globals);
+        if (DEBUG) {
+            println!("ModuleCtx Imports: {:?}", self.module_ctx.imports);
+            println!("ModuleCtx Exports: {:?}", self.module_ctx.exports);
+            println!("ModuleCtx Deps: {:?}", self.module_ctx.deps);
+            println!("ModuleCtx Services: {:?}", self.module_ctx.services.keys());
+            println!("ModuleCtx Globals: {:?}", self.module_ctx.globals);
         }
 
         let mut sub_router = axum::Router::new();
@@ -201,9 +209,17 @@ impl<T: Module> NidrsFactory<T> {
     pub fn block(mut self) {
         // listen...
         let server = || async {
+            // TODO: 2 (Compile)
             let tcp = tokio::net::TcpListener::bind(format!("{}:{}", self.host, self.port)).await?;
             let addr = tcp.local_addr()?;
             nidrs_macro::log!("Listening on {}", addr);
+
+            let cors_layer = CorsLayer::new()
+                .allow_origin(tower_http::cors::Any) // Allow requests from any origin
+                .allow_methods(tower_http::cors::Any) // Allow all HTTP methods (GET, POST, etc.)
+                .allow_headers(tower_http::cors::Any); // Allow all headers (e.g., Content-Type, Authorization)
+
+            // self.router.layer(cors_layer);
 
             axum::serve(tcp, self.router.with_state(StateCtx {})).await?;
 
@@ -221,6 +237,7 @@ impl<T: Module> NidrsFactory<T> {
         if let Some(rt) = &*self.rt.write().unwrap() {
             rt.block_on(async {
                 // 使用 tokio::select 宏同时监听服务器和退出信号
+                // TODO: 1 (Compile)
                 tokio::select! {
                     _ = server() => {
                       nidrs_macro::elog!("Server exited unexpectedly.");

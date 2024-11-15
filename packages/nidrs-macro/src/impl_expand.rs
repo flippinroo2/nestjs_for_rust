@@ -51,8 +51,8 @@ pub(crate) fn route(method: &str, args: TokenStream, input: TokenStream) -> Toke
     let current_controller_name: String =
         cmeta::CMeta::get_stack_data("ServiceName").expect(&format!("[route] {} ServiceName not found", route_name));
 
-    let mut routes = ROUTES.lock().unwrap();
-    let controller = routes.get_mut(&current_controller_name).unwrap();
+    let mut routes = ROUTES.lock().expect("Failed to lock ROUTES in route macro");
+    let controller = routes.get_mut(&current_controller_name).expect("Failed to get controller in route macro");
     controller.push(route_name.clone());
 
     TokenStream::from(quote! {
@@ -80,7 +80,7 @@ pub(crate) fn route_derive(args: TokenStream, input: TokenStream) -> TokenStream
                 // println!("route_derive {:#?}", segment);
                 if segment.ident.to_string() == "AppResult" {
                     if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                        if let syn::GenericArgument::Type(ty) = args.args.first().unwrap() {
+                        if let syn::GenericArgument::Type(ty) = args.args.first().expect("Failed to get first argument in route_derive") {
                             if let syn::Type::Tuple(_) = ty {
                                 is_tuple = true;
                             }
@@ -149,7 +149,7 @@ pub(crate) fn route_derive(args: TokenStream, input: TokenStream) -> TokenStream
 
             quote! {
                 .layer(axum::middleware::from_fn({
-                    let inter = ctx.get_interceptor::<#inter_ident>(module_name, #inter);
+                    let inter = ctx.get_interceptor::<#inter_ident>(module, #inter);
                     move |req: axum::extract::Request, next: axum::middleware::Next| {
                         let inter = std::sync::Arc::clone(&inter);
                         async move {
@@ -188,7 +188,7 @@ pub(crate) fn route_derive(args: TokenStream, input: TokenStream) -> TokenStream
             #meta_tokens
         }
 
-        pub fn #route_fn_ident(&self, mut ctx: nidrs::ModuleCtx)->nidrs::ModuleCtx{
+        pub fn #route_fn_ident(&self, mut ctx: nidrs::ModuleCtx, module: &str)->nidrs::ModuleCtx{
             use nidrs::externs::axum;
             use axum::response::IntoResponse;
             use nidrs::externs::axum::{extract::Query, Json};
@@ -211,10 +211,9 @@ pub(crate) fn route_derive(args: TokenStream, input: TokenStream) -> TokenStream
             meta.set_data(nidrs::datasets::RouterFullPath(full_path.clone()));
 
             let meta = Meta::new(meta);
-            let module_name = meta.get::<&str>("module").unwrap();
             let controller_name = meta.get_data::<nidrs::datasets::ServiceName>().unwrap().value();
 
-            let t_controller = ctx.get_controller::<Self>(module_name, controller_name);
+            let t_controller = ctx.get_controller::<Self>(module, controller_name);
 
             let router = nidrs::externs::axum::Router::new()
                 .route(
@@ -242,8 +241,9 @@ pub(crate) fn expand_controller_register(module_name: String, services: &def::Ar
         .iter()
         .map(|controller_token| {
             let controller_name = controller_token.to_string();
-            let binding = ROUTES.lock().unwrap();
-            let controller: &Vec<String> = binding.get(&controller_name).unwrap();
+            let binding = ROUTES.lock().expect("Failed to lock ROUTES in expand_controller_register");
+            let controller: &Vec<String> =
+                binding.get(&controller_name).expect(&format!("Failed to get controller {} in expand_controller_register", controller_name));
             let controller_ident = syn::Ident::new(&controller_name, Span::call_site().into());
             let router_path = controller
                 .iter()
@@ -251,14 +251,14 @@ pub(crate) fn expand_controller_register(module_name: String, services: &def::Ar
                     let route_ident = syn::Ident::new(&format!("__route_{}", name), Span::call_site().into());
 
                     quote! {
-                        ctx = t_controller.#route_ident(ctx);
+                        ctx = t_controller.#route_ident(ctx, #module_name);
                     }
                 })
                 .collect::<Vec<TokenStream2>>();
 
             quote! {
-                if ctx.register_controller(#module_name, #controller_name, Box::new(std::sync::Arc::new(controller::#controller_ident::default()))) {
-                    let t_controller = ctx.get_controller::<controller::#controller_ident>(#module_name, #controller_name);
+                if ctx.register_controller(#module_name, #controller_name, Box::new(std::sync::Arc::new(#controller_ident::default()))) {
+                    let t_controller = ctx.get_controller::<#controller_ident>(#module_name, #controller_name);
                     #(#router_path)*
                 }
             }
@@ -333,7 +333,7 @@ pub(crate) fn expand_imports_register(module_name: String, imports: &def::Array<
 
                     let dyn_module_name = import_module_ident.join("::");
 
-                    let import_module_ident: Path = syn::parse_str(&dyn_module_name).unwrap();
+                    let import_module_ident: Path = syn::parse_str(&dyn_module_name).expect(&format!("Failed to parse module path {} in expand_imports_register", dyn_module_name));
                     let import_module_ident = import_module_ident.to_token_stream();
                     import_names.push(dyn_module_name.clone());
         
@@ -412,11 +412,12 @@ pub(crate) fn gen_service_inject_tokens(service_type: ServiceType, func: &ItemSt
             .named
             .iter()
             .map(|field| {
-                let field_ident = field.ident.as_ref().unwrap();
+                let field_ident = field.ident.as_ref().expect("Failed to get field identifier in gen_service_inject_tokens");
                 let field_type = &field.ty;
 
                 if let Type::Path(type_path) = field_type {
-                    let type_ident = type_path.path.segments.first().unwrap().ident.to_string();
+                    let type_ident =
+                        type_path.path.segments.first().expect("Failed to get type identifier in gen_service_inject_tokens").ident.to_string();
                     if type_ident == "Inject" {
                         let type_args = type_path.path.segments.first().unwrap().arguments.to_owned();
                         if let syn::PathArguments::AngleBracketed(args) = type_args {
@@ -470,7 +471,7 @@ pub(crate) fn gen_service_inject_tokens(service_type: ServiceType, func: &ItemSt
         }
 
         impl #impl_generics nidrs::ImplMeta for #service_name_ident #ty_generics #where_clause{
-            fn __meta() -> nidrs::InnerMeta {
+            fn __meta(&self) -> nidrs::InnerMeta {
                 #meta_tokens
             }
         }
@@ -481,7 +482,7 @@ pub(crate) fn gen_service_inject_tokens(service_type: ServiceType, func: &ItemSt
 
 pub(crate) fn expand_events_trigger(module_name: String, event_name: &str) -> TokenStream2 {
     // let event_name_ident = syn::Ident::new(event_name, Span::call_site().into());
-    let binding = EVENTS.lock().unwrap();
+    let binding = EVENTS.lock().expect("Failed to lock EVENTS in expand_events_trigger");
     let on_module_event = binding.get(event_name);
     if let None = on_module_event {
         return TokenStream2::new();
@@ -543,7 +544,7 @@ pub(crate) fn merge_defaults_interceptors(interceptors: def::Array<def::Expr>) -
     let defaults_interceptors = def::Array(
         DEFAULT_INTERS
             .lock()
-            .unwrap()
+            .expect("Failed to lock DEFAULT_INTERS in merge_defaults_interceptors")
             .clone()
             .iter()
             .map(|inter| {

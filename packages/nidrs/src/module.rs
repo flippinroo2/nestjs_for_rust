@@ -129,7 +129,7 @@ impl<T: Module> NidrsFactory<T> {
     }
 
     pub fn default_uses<I: Interceptor + 'static + Sync + Send>(mut self, inter: I) -> Self {
-        let service_name = I::__meta().get_data::<datasets::ServiceName>().unwrap().value().clone();
+        let service_name = inter.__meta().get_data::<datasets::ServiceName>().unwrap().value().clone();
         let interceptor = Arc::new(inter);
         self.module_ctx.register_interceptor(GLOBALS_KEY, &service_name, Box::new(interceptor.clone()));
 
@@ -406,6 +406,14 @@ impl ModuleCtx {
             return true;
         } else {
             nidrs_macro::elog!("Service {} already exists.", svc_key);
+        }
+        false
+    }
+
+    pub fn register_module(&mut self, current_module_name: &str, module: Box<dyn Module>) -> bool {
+        if !self.modules.contains_key(current_module_name) {
+            self.modules.insert(current_module_name.to_string(), module);
+            return true;
         }
         false
     }

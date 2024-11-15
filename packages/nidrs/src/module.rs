@@ -18,9 +18,11 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
+use tower_http::cors::CorsLayer;
 
 use crate::{provider, shared::otr, template_format, AppResult, InnerMeta, Interceptor, Service};
 
+static DEBUG: bool = false;
 static GLOBALS_KEY: &str = "Defaults";
 
 pub trait Module {
@@ -86,6 +88,7 @@ pub struct NidrsFactory<T: Module> {
     pub module: Option<T>,
     pub module_ctx: ModuleCtx,
     pub router: axum::Router<StateCtx>,
+    pub host: String,
     pub port: u32,
     pub rt: RwLock<Option<tokio::runtime::Runtime>>,
     pub inter_apply: Vec<Box<dyn FnOnce(axum::Router<StateCtx>) -> axum::Router<StateCtx> + 'static>>,
@@ -95,13 +98,20 @@ pub struct NidrsFactory<T: Module> {
 
 impl<T: Module> NidrsFactory<T> {
     pub fn create(module: T) -> Self {
+        // TODO: Creating original axum::Router
         let router: axum::Router<StateCtx> = axum::Router::new();
+        let cross_origin_layer = CorsLayer::new()
+            .allow_origin(tower_http::cors::Any) // Allow requests from any origin
+            .allow_methods(tower_http::cors::Any) // Allow all HTTP methods (GET, POST, etc.)
+            .allow_headers(tower_http::cors::Any); // Allow all headers (e.g., Content-Type, Authorization)
+                                                   // router.layer(cross_origin_layer);
         let module_ctx = ModuleCtx::new(ModuleDefaults { default_version: "v1", default_prefix: "" });
         NidrsFactory {
             rt: RwLock::new(None),
             router,
             module: Some(module),
             module_ctx,
+            host: String::from("127.0.0.1"),
             port: 3000,
             router_hook: Box::new(|r| r.router),
             inter_apply: vec![],
@@ -124,6 +134,7 @@ impl<T: Module> NidrsFactory<T> {
         self.module_ctx.register_interceptor(GLOBALS_KEY, &service_name, Box::new(interceptor.clone()));
 
         self.inter_apply.push(Box::new(move |router| {
+            // TODO: layer()
             router.layer(axum::middleware::from_fn({
                 move |req: axum::extract::Request, next: axum::middleware::Next| {
                     let inter = std::sync::Arc::clone(&interceptor);
@@ -158,16 +169,19 @@ impl<T: Module> NidrsFactory<T> {
         self
     }
 
-    pub fn listen(mut self, port: u32) -> Self {
+    pub fn listen(mut self, host: &str, port: u32) -> Self {
+        self.host = String::from(host);
         self.port = port;
         let module = self.module.take().unwrap();
 
         self.module_ctx = module.init(self.module_ctx);
-        // println!("ModuleCtx Imports: {:?}", &module_ctx.imports);
-        // println!("ModuleCtx Exports: {:?}", &module_ctx.exports);
-        // println!("ModuleCtx Deps: {:?}", &module_ctx.deps);
-        // println!("ModuleCtx Services: {:?}", &module_ctx.services.keys());
-        // println!("ModuleCtx Globals: {:?}", &module_ctx.globals);
+        if (DEBUG) {
+            println!("ModuleCtx Imports: {:?}", self.module_ctx.imports);
+            println!("ModuleCtx Exports: {:?}", self.module_ctx.exports);
+            println!("ModuleCtx Deps: {:?}", self.module_ctx.deps);
+            println!("ModuleCtx Services: {:?}", self.module_ctx.services.keys());
+            println!("ModuleCtx Globals: {:?}", self.module_ctx.globals);
+        }
 
         let mut sub_router = axum::Router::new();
         for router in self.module_ctx.routers.iter() {
@@ -180,9 +194,9 @@ impl<T: Module> NidrsFactory<T> {
         {
             self.router = self.router.merge(nidrs_openapi::register(&self.module_ctx.routers));
 
-            nidrs_macro::log!("Swagger UI on {}", format!("http://127.0.0.1:{}/swagger-ui", self.port));
-            nidrs_macro::log!("Rapidoc UI on {}", format!("http://127.0.0.1:{}/rapidoc", self.port));
-            nidrs_macro::log!("Redoc UI on {}", format!("http://127.0.0.1:{}/redoc", self.port));
+            nidrs_macro::log!("Swagger UI on {}", format!("http://{}:{}/swagger-ui", self.host, self.port));
+            nidrs_macro::log!("Rapidoc UI on {}", format!("http://{}:{}/rapidoc", self.host, self.port));
+            nidrs_macro::log!("Redoc UI on {}", format!("http://{}:{}/redoc", self.host, self.port));
         }
 
         while let Some(apply) = self.inter_apply.pop() {
@@ -195,9 +209,17 @@ impl<T: Module> NidrsFactory<T> {
     pub fn block(mut self) {
         // listen...
         let server = || async {
-            let tcp = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", self.port)).await?;
+            // TODO: 2 (Compile)
+            let tcp = tokio::net::TcpListener::bind(format!("{}:{}", self.host, self.port)).await?;
             let addr = tcp.local_addr()?;
             nidrs_macro::log!("Listening on {}", addr);
+
+            let cors_layer = CorsLayer::new()
+                .allow_origin(tower_http::cors::Any) // Allow requests from any origin
+                .allow_methods(tower_http::cors::Any) // Allow all HTTP methods (GET, POST, etc.)
+                .allow_headers(tower_http::cors::Any); // Allow all headers (e.g., Content-Type, Authorization)
+
+            // self.router.layer(cors_layer);
 
             axum::serve(tcp, self.router.with_state(StateCtx {})).await?;
 
@@ -215,6 +237,7 @@ impl<T: Module> NidrsFactory<T> {
         if let Some(rt) = &*self.rt.write().unwrap() {
             rt.block_on(async {
                 // 使用 tokio::select 宏同时监听服务器和退出信号
+                // TODO: 1 (Compile)
                 tokio::select! {
                     _ = server() => {
                       nidrs_macro::elog!("Server exited unexpectedly.");

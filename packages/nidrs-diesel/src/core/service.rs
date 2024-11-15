@@ -8,11 +8,11 @@ impl DieselService {
     #[on_module_init()]
     pub fn on_module_init(&self) {
         // let options = self.options.extract();
-        // println!("DieselService initialized");
+        println!("DieselService initialized");
     }
 
     #[on_module_destroy()]
     pub fn on_module_destroy(&self) {
-        // println!("DieselService destroyed");
+        println!("DieselService destroyed");
     }
 }

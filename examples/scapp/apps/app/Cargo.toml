@@ -7,19 +7,18 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde_json = "1.0.115"
-serde = { version = "1.0.193", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+diesel = { version = "2.2.4", features = ["postgres", "chrono"] }
 dotenvy = "0.15"
+serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.115"
 utoipa = "4.2.3"
 
+datasets = { workspace = true }
 nidrs = { workspace = true }
 nidrs-macro = { workspace = true }
 nidrs-extern = { workspace = true }
 nidrs-diesel = { workspace = true, features = ["postgres"] }
-diesel = { version = "2.2.4", features = ["postgres", "chrono"] }
-chrono = { version = "0.4", features = ["serde"] }
-
 
 shared = { workspace = true }
 macros = { workspace = true }
-datasets = { workspace = true }

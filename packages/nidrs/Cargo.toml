@@ -16,9 +16,13 @@ nidrs-macro = { workspace = true }
 nidrs-extern = { workspace = true }
 nidrs-valid = { workspace = true, optional = true }
 nidrs-openapi = { workspace = true, optional = true }
+tower = "0.4"
+tower-http = { version = "0.4", features = ["cors"] }
+# tower = "0.5.1"
+# tower-http = "0.6.1"
 
 [features]
-default = ["tower", "serde"]
+default = ["serde", "tower"]
 tower = ["nidrs-extern/tower"]
 serde = ["nidrs-extern/serde"]
 valid = ["nidrs-valid"]

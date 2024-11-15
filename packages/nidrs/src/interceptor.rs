@@ -49,6 +49,7 @@ impl IntoResponse for AnyBody {
             Err(e) => Bytes::from(e.to_string()),
         };
 
+        // TODO: Response::builder() & application/json response
         Response::builder().status(StatusCode::OK).header("Content-Type", "application/json").body(Body::from(body)).unwrap()
     }
 }

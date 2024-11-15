@@ -24,6 +24,7 @@ fn main() {
     let app = app.default_version("v1");
     // let app = app.default_uses(app::interceptor::AppInterceptor);
     let app = app.default_layer(
+        // TODO: default_layer()
         nidrs::externs::tower::ServiceBuilder::new()
             .layer(HandleErrorLayer::new(|error: BoxError| async move {
                 if error.is::<nidrs::externs::tower::timeout::error::Elapsed>() {
@@ -60,7 +61,7 @@ fn main() {
     //     }
     // });
 
-    let app = app.listen(3000);
+    let app = app.listen("127.0.0.1", 3000);
 
     // app.router = app.router.route_layer(middleware::from_fn(auth));
     // app.router = app.router.layer(ServiceBuilder::new().layer(middleware::from_fn(auth)));

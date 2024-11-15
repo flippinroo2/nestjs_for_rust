@@ -37,7 +37,7 @@ fn main() {
             .layer(middleware::from_fn(auth)),
     );
 
-    let app = app.listen(3000);
+    let app = app.listen("127.0.0.1", 3000);
 
     app.block();
 }

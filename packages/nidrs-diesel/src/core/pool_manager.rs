@@ -39,7 +39,7 @@ pub mod sqlite {
             // Refer to the `r2d2` documentation for more methods to use
             // when building a connection pool
             let pool: Pool<ConnectionManager<TConnection>> =
-                Pool::builder().test_on_check_out(true).build(manager).expect("Could not build connection pool");
+                Pool::builder().test_on_check_out(true).build(manager).expect("Could not build connection pool"); // This is where the file:db.sqlite3 file is created if it doesn't exist... Was able to fix this by putting "file:src/db.sqlite3" instead.
 
             SqlitePoolManager { pool: Some(Mutex::new(pool)) }
         }
